@@ -519,7 +519,7 @@ const eventFromRow = async (
   const eventHtml = eventView
     ? `<div style="overflow: hidden;">
         ${url ? `<a href="${url}" class="decoration-none">` : ""}
-          ${await eventView.run({ id: row.id }, { req })}
+          ${await eventView.run({ [pk]: row[pk] }, { req })}
           ${url ? "</a>" : ""}
       </div>`
     : undefined;
