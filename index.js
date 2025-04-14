@@ -484,7 +484,7 @@ const buildJoinFields = (event_color) => {
 };
 const eventFromRow = async (
   row,
-  tableId,
+  table,
   alwaysAllDay,
   transferedState,
   eventView,
@@ -507,8 +507,11 @@ const eventFromRow = async (
   const start = row[start_field]; //start = start field
   const allDay = alwaysAllDay || row[allday_field]; //if allday field is "always", allday=true, otherwise use value
   const end = switch_to_duration ? end_by_duration : row[end_field]; // if using duration, show end by duration. otherwise, use end field value.
+  const pk = table.pk_name;
   const url = expand_view
-    ? `/view/${expand_view}?id=${row.id}${transferedState || ""}`
+    ? `/view/${expand_view}?${pk}=${encodeURIComponent(row[pk])}${
+        transferedState || ""
+      }`
     : undefined; //url to go to when the event is clicked
   const color =
     row[event_color && event_color.includes(".") ? "_color" : event_color]; // color of the event: uses a table field or the joined '_color' field
@@ -522,7 +525,7 @@ const eventFromRow = async (
     : undefined;
   return {
     title: row[title_field],
-    tableId,
+    tableId: table.id,
     start,
     allDay,
     end,
@@ -576,7 +579,7 @@ const addOtherCalendars = async (
       rows.map((row) =>
         eventFromRow(
           row,
-          table_id,
+          table,
           alwaysAllDay,
           transferedState,
           eventView,
@@ -665,7 +668,7 @@ const run = async (
     rows.map((row) =>
       eventFromRow(
         row,
-        table_id,
+        table,
         alwaysAllDay,
         transferedState,
         eventView,
@@ -1053,7 +1056,7 @@ const buildResponse = async (
     json: {
       newEvent: await eventFromRow(
         updatedRow[0],
-        table.id,
+        table,
         allday_field === "Always",
         undefined,
         eventView,
