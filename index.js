@@ -188,6 +188,19 @@ const configuration_workflow = (req) =>
                 },
               },
               {
+                name: "rrule_field",
+                label: "Recurrence rule field",
+                type: "String",
+                sublabel: "A String field with RRule syntax",
+                required: false,
+                attributes: {
+                  options: fields
+                    .filter((f) => f.type.name === "String")
+                    .map((f) => f.name)
+                    .join(),
+                },
+              },
+              {
                 name: "include_fml",
                 label: req.__("Row inclusion formula"),
                 class: "validate-expression",
@@ -499,6 +512,7 @@ const eventFromRow = async (
     switch_to_duration,
     title_field,
     event_color,
+    rrule_field,
   }
 ) => {
   const unitSecs = unitSeconds(duration_units);
@@ -523,7 +537,7 @@ const eventFromRow = async (
           ${url ? "</a>" : ""}
       </div>`
     : undefined;
-  return {
+  const ev = {
     title: row[title_field],
     tableId: table.id,
     start,
@@ -534,6 +548,8 @@ const eventFromRow = async (
     id,
     eventHtml,
   };
+  if (rrule_field && row[rrule_field]) ev.rrule = row[rrule_field];
+  return ev;
 };
 const buildTransferedState = (fields, state, excluded) => {
   return fields && state
@@ -622,6 +638,7 @@ const run = async (
     reload_on_drag_resize,
     include_fml,
     caldav_url,
+    rrule_field,
     ...rest
   },
   state,
@@ -683,6 +700,7 @@ const run = async (
           switch_to_duration,
           title_field,
           event_color,
+          rrule_field,
         }
       )
     )
@@ -696,7 +714,26 @@ const run = async (
   );
   return (
     (caldav_url
-      ? script({ defer: true, src: "/plugins/public/fullcalendar/caldav.js" })
+      ? script({
+          defer: true,
+          src: `/plugins/public/fullcalendar@${
+            require("./package.json").version
+          }/caldav.js`,
+        })
+      : "") +
+    (rrule_field
+      ? script({
+          defer: true,
+          src: `/plugins/public/fullcalendar@${
+            require("./package.json").version
+          }/rrule.min.js`,
+        }) +
+        script({
+          defer: true,
+          src: `/plugins/public/fullcalendar@${
+            require("./package.json").version
+          }/fc-rrule.min.js`,
+        })
       : "") +
     div(
       script(
@@ -1190,13 +1227,19 @@ const headers = [
     </style>`,
   },
   {
-    script: "/plugins/public/fullcalendar/main.min.js",
+    script: `/plugins/public/fullcalendar@${
+      require("./package.json").version
+    }/main.min.js`,
   },
   {
-    script: "/plugins/public/fullcalendar/locales-all.min.js",
+    script: `/plugins/public/fullcalendar@${
+      require("./package.json").version
+    }/locales-all.min.js`,
   },
   {
-    css: "/plugins/public/fullcalendar/main.min.css",
+    css: `/plugins/public/fullcalendar@${
+      require("./package.json").version
+    }/main.min.css`,
   },
 ];
 const connectedObjects = async ({
