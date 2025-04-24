@@ -613,10 +613,8 @@ const addOtherCalendars = async (
   }
 };
 
-const run = async (
-  table_id,
-  viewname,
-  {
+const run = async (table_id, viewname, config, state, extraArgs) => {
+  const {
     view_to_create,
     expand_view,
     start_field,
@@ -646,33 +644,16 @@ const run = async (
     rrule_field,
     progressive_load,
     ...rest
-  },
-  state,
-  extraArgs
-) => {
+  } = config;
   const table = await Table.findOne({ id: table_id });
   const fields = await table.getFields();
   readState(state, fields);
-  const where = await stateFieldsToWhere({ fields, state });
-  if (include_fml) {
-    const ctx = {
-      ...state,
-      user_id: extraArgs.req.user?.id || null,
-      user: extraArgs.req.user,
-    };
-    let where1 = jsexprToWhere(include_fml, ctx, fields);
-    mergeIntoWhere(where, where1 || {});
-  }
-  let rows = [];
+
+  let events = [];
   if (!progressive_load) {
-    rows = await table.getJoinedRows({
-      where,
-      joinFields: buildJoinFields(event_color),
-    });
+    events = await get_events(table, viewname, config, state, extraArgs);
   }
-  const otherCalendars = (await View.find({ viewtemplate: "Calendar" })).filter(
-    (view) => view.name !== viewname && rest[view.name]
-  );
+
   const id = `cal${Math.round(Math.random() * 100000)}`;
   const weekends = limit_to_working_days ? false : true; // fullcalendar flag to filter out weekends
   // parse min/max times or use defaults
@@ -687,40 +668,7 @@ const run = async (
   const excluded = [start_field];
   if (end_field) excluded.push(end_field);
   const transferedSelectState = buildTransferedState(fields, state, excluded);
-  const eventView = event_view
-    ? await View.findOne({ name: event_view })
-    : undefined;
-  const events = await Promise.all(
-    rows.map((row) =>
-      eventFromRow(
-        row,
-        table,
-        alwaysAllDay,
-        transferedState,
-        eventView,
-        extraArgs.req,
-        {
-          expand_view,
-          start_field,
-          allday_field,
-          end_field,
-          duration_field,
-          duration_units,
-          switch_to_duration,
-          title_field,
-          event_color,
-          rrule_field,
-        }
-      )
-    )
-  );
-  await addOtherCalendars(
-    events,
-    otherCalendars,
-    extraArgs.req,
-    state,
-    transferedState
-  );
+
   return (
     (caldav_url
       ? script({
@@ -1138,6 +1086,105 @@ const buildResponse = async (
   };
 };
 
+const get_events = async (
+  table,
+  viewname,
+  {
+    view_to_create,
+    expand_view,
+    start_field,
+    allday_field,
+    end_field,
+    duration_units,
+    duration_field,
+    switch_to_duration,
+    title_field,
+    nowIndicator,
+    weekNumbers,
+    initialView,
+    default_event_color,
+    calendar_view_options,
+    custom_calendar_views,
+    event_color,
+    limit_to_working_days,
+    min_week_view_time,
+    max_week_view_time,
+    expand_display_mode,
+    create_display_mode,
+    reload_on_edit_in_pop_up,
+    event_view,
+    reload_on_drag_resize,
+    include_fml,
+    caldav_url,
+    rrule_field,
+    progressive_load,
+    ...rest
+  },
+  state,
+  extraArgs
+) => {
+  const fields = await table.getFields();
+  readState(state, fields);
+  const where = await stateFieldsToWhere({ fields, state });
+  if (include_fml) {
+    const ctx = {
+      ...state,
+      user_id: extraArgs.req.user?.id || null,
+      user: extraArgs.req.user,
+    };
+    let where1 = jsexprToWhere(include_fml, ctx, fields);
+    mergeIntoWhere(where, where1 || {});
+  }
+
+  const rows = await table.getJoinedRows({
+    where,
+    joinFields: buildJoinFields(event_color),
+  });
+  const otherCalendars = (await View.find({ viewtemplate: "Calendar" })).filter(
+    (view) => view.name !== viewname && rest[view.name]
+  );
+  // parse min/max times or use defaults
+  const alwaysAllDay = allday_field === "Always";
+  const transferedState = buildTransferedState(fields, state);
+  const excluded = [start_field];
+  if (end_field) excluded.push(end_field);
+  const eventView = event_view
+    ? await View.findOne({ name: event_view })
+    : undefined;
+  const events = await Promise.all(
+    rows.map((row) =>
+      eventFromRow(
+        row,
+        table,
+        alwaysAllDay,
+        transferedState,
+        eventView,
+        extraArgs.req,
+        {
+          expand_view,
+          start_field,
+          allday_field,
+          end_field,
+          duration_field,
+          duration_units,
+          switch_to_duration,
+          title_field,
+          event_color,
+          rrule_field,
+        }
+      )
+    )
+  );
+  await addOtherCalendars(
+    events,
+    otherCalendars,
+    extraArgs.req,
+    state,
+    transferedState
+  );
+  return events;
+};
+
 /*
  * service to load a calendar event from the db
  */
@@ -1157,20 +1204,24 @@ const load_calendar_event = async (
 };
 
 const ajax_load_events = async (
-  unusedTableID, // use tableId for multi table support
+  table_id, // use tableId for multi table support
   viewname,
   config,
   dataObj,
-  { req }
+  extraArgs
 ) => {
   console.log(dataObj);
-  return {json: []}
-  const table = await Table.findOne({ id: tableId });
-  const role = req.isAuthenticated() ? req.user.role_id : public_user_role;
-  if (role > table.min_role_write) {
-    return { json: { error: req.__("Not authorized") } };
-  }
-  return await buildResponse(table, rowId, req, config);
+  const table = await Table.findOne({ id: table_id });
+
+  const events = await get_events(
+    table,
+    viewname,
+    config,
+    dataObj.state,
+    extraArgs
+  );
+
+  return { json: events };
 };
 /*
  * service to update a calendar event in the db
