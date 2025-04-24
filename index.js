@@ -901,7 +901,7 @@ const run = async (table_id, viewname, config, state, extraArgs) => {
       }
       view_post('${viewname}', 'ajax_load_events', dataObj,
           (res) => {
-            //console.log("ajax resp", res)
+            //console.log("ajax resp", res.length)
             successCallback(res)
             })
       
@@ -1207,19 +1207,17 @@ const ajax_load_events = async (
   table_id, // use tableId for multi table support
   viewname,
   config,
-  dataObj,
+  { info, state },
   extraArgs
 ) => {
-  console.log(dataObj);
   const table = await Table.findOne({ id: table_id });
 
-  const events = await get_events(
-    table,
-    viewname,
-    config,
-    dataObj.state,
-    extraArgs
-  );
+  if (info.start) state[config.end_field] = { gt: new Date(info.start) };
+  if (info.end) state[config.start_field] = { lt: new Date(info.end) };
+
+  //console.log({ state });
+
+  const events = await get_events(table, viewname, config, state, extraArgs);
 
   return { json: events };
 };
