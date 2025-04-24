@@ -651,7 +651,19 @@ const run = async (table_id, viewname, config, state, extraArgs) => {
 
   let events = [];
   if (!progressive_load) {
-    events = await get_events(table, viewname, config, state, extraArgs);
+    const where = await stateFieldsToWhere({ fields, state });
+
+    if (include_fml) {
+      const ctx = {
+        ...state,
+        user_id: extraArgs.req.user?.id || null,
+        user: extraArgs.req.user,
+      };
+      let where1 = jsexprToWhere(include_fml, ctx, fields);
+      mergeIntoWhere(where, where1 || {});
+    }
+
+    events = await get_events(table, viewname, config, state, extraArgs, where);
   }
 
   const id = `cal${Math.round(Math.random() * 100000)}`;
@@ -1121,25 +1133,17 @@ const get_events = async (
     ...rest
   },
   state,
-  extraArgs
+  extraArgs,
+  where
 ) => {
   const fields = await table.getFields();
-  readState(state, fields);
-  const where = await stateFieldsToWhere({ fields, state });
-  if (include_fml) {
-    const ctx = {
-      ...state,
-      user_id: extraArgs.req.user?.id || null,
-      user: extraArgs.req.user,
-    };
-    let where1 = jsexprToWhere(include_fml, ctx, fields);
-    mergeIntoWhere(where, where1 || {});
-  }
 
   const rows = await table.getJoinedRows({
     where,
     joinFields: buildJoinFields(event_color),
   });
+  console.log(rows.length);
+
   const otherCalendars = (await View.find({ viewtemplate: "Calendar" })).filter(
     (view) => view.name !== viewname && rest[view.name]
   );
@@ -1211,13 +1215,41 @@ const ajax_load_events = async (
   extraArgs
 ) => {
   const table = await Table.findOne({ id: table_id });
+  const fields = await table.getFields();
+  const where = await stateFieldsToWhere({ fields, state });
 
-  if (info.start) state[config.end_field] = { gt: new Date(info.start) };
-  if (info.end) state[config.start_field] = { lt: new Date(info.end) };
+  if (config.include_fml) {
+    const ctx = {
+      ...state,
+      user_id: extraArgs.req.user?.id || null,
+      user: extraArgs.req.user,
+    };
+    let where1 = jsexprToWhere(config.include_fml, ctx, fields);
+    mergeIntoWhere(where, where1 || {});
+  }
+  let where2 = { ...where };
 
+  if (info.start && info.end && config.rrule_field) {
+    where2 = {
+      or: [
+        {
+          [config.end_field]: { gt: new Date(info.start) },
+          [config.start_field]: { lt: new Date(info.end) },
+          ...where,
+        },
+        { not: { [config.rrule_field]: null } },
+      ],
+    };
+  } else if (info.start && info.end) {
+    where2 = {
+      [config.end_field]: { gt: new Date(info.start) },
+      [config.start_field]: { lt: new Date(info.end) },
+      ...where,
+    };
+  }
   //console.log({ state });
 
-  const events = await get_events(table, viewname, config, state, extraArgs);
+  const events = await get_events(table, viewname, config, state, extraArgs, where2);
 
   return { json: events };
 };
