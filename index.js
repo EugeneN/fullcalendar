@@ -14,7 +14,7 @@ const {
   jsexprToWhere,
 } = require("@saltcorn/data/models/expression");
 const { mergeIntoWhere } = require("@saltcorn/data/utils");
-
+const moment = require("moment");
 const {
   text,
   div,
@@ -553,7 +553,11 @@ const eventFromRow = async (
     id,
     eventHtml,
   };
-  if (rrule_field && row[rrule_field]) ev.rrule = row[rrule_field];
+  if (rrule_field && row[rrule_field]) {
+    ev.rrule = `DTSTART:${moment(start).utc().format("YYYYMMDDTHHmmSS")}Z\n${
+      row[rrule_field]
+    }`;
+  }
   return ev;
 };
 const buildTransferedState = (fields, state, excluded) => {
@@ -1142,7 +1146,6 @@ const get_events = async (
     where,
     joinFields: buildJoinFields(event_color),
   });
-  console.log(rows.length);
 
   const otherCalendars = (await View.find({ viewtemplate: "Calendar" })).filter(
     (view) => view.name !== viewname && rest[view.name]
@@ -1249,7 +1252,14 @@ const ajax_load_events = async (
   }
   //console.log({ state });
 
-  const events = await get_events(table, viewname, config, state, extraArgs, where2);
+  const events = await get_events(
+    table,
+    viewname,
+    config,
+    state,
+    extraArgs,
+    where2
+  );
 
   return { json: events };
 };
