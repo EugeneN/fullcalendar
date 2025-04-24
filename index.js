@@ -299,6 +299,11 @@ const configuration_workflow = (req) =>
                 type: "Bool",
                 default: false,
               },
+              {
+                name: "progressive_load",
+                label: "Progressive loading",
+                type: "Bool",
+              },
             ],
           });
         },
@@ -639,6 +644,7 @@ const run = async (
     include_fml,
     caldav_url,
     rrule_field,
+    progressive_load,
     ...rest
   },
   state,
@@ -657,10 +663,13 @@ const run = async (
     let where1 = jsexprToWhere(include_fml, ctx, fields);
     mergeIntoWhere(where, where1 || {});
   }
-  const rows = await table.getJoinedRows({
-    where,
-    joinFields: buildJoinFields(event_color),
-  });
+  let rows = [];
+  if (!progressive_load) {
+    rows = await table.getJoinedRows({
+      where,
+      joinFields: buildJoinFields(event_color),
+    });
+  }
   const otherCalendars = (await View.find({ viewtemplate: "Calendar" })).filter(
     (view) => view.name !== viewname && rest[view.name]
   );
@@ -935,7 +944,22 @@ const run = async (
         : ""
     }
 
-    events: ${JSON.stringify(events)},
+    events: ${
+      progressive_load
+        ? `(info, successCallback, failureCallback) =>{
+      const dataObj = {
+         info,
+         state: ${JSON.stringify(state)}
+      }
+      view_post('${viewname}', 'ajax_load_events', dataObj,
+          (res) => {
+            //console.log("ajax resp", res)
+            successCallback(res)
+            })
+      
+      }`
+        : JSON.stringify(events)
+    },
     ${
       caldav_url
         ? `eventSources: [      
@@ -1131,6 +1155,23 @@ const load_calendar_event = async (
   }
   return await buildResponse(table, rowId, req, config);
 };
+
+const ajax_load_events = async (
+  unusedTableID, // use tableId for multi table support
+  viewname,
+  config,
+  dataObj,
+  { req }
+) => {
+  console.log(dataObj);
+  return {json: []}
+  const table = await Table.findOne({ id: tableId });
+  const role = req.isAuthenticated() ? req.user.role_id : public_user_role;
+  if (role > table.min_role_write) {
+    return { json: { error: req.__("Not authorized") } };
+  }
+  return await buildResponse(table, rowId, req, config);
+};
 /*
  * service to update a calendar event in the db
  */
@@ -1303,7 +1344,7 @@ module.exports = {
       get_state_fields,
       configuration_workflow,
       run,
-      routes: { update_calendar_event, load_calendar_event },
+      routes: { update_calendar_event, load_calendar_event, ajax_load_events },
       connectedObjects,
     },
   ],
