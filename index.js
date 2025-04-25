@@ -47,6 +47,35 @@ const getColorOptions = async (fields) => {
   }
   return result;
 };
+
+const module_configuration_workflow = (req) =>
+  new Workflow({
+    steps: [
+      {
+        name: "License",
+        blurb: "Select open source or premium license",
+        form: async (context) => {
+          return new Form({
+            fields: [
+              {
+                name: "enable_premium",
+                type: "Bool",
+                label: "Enable premium scheduler",
+                default: false,
+              },
+              {
+                name: "premium_license",
+                type: "String",
+                label: "Premium license key",
+                showIf: { enable_premium: true },
+              },
+            ],
+          });
+        },
+      },
+    ],
+  });
+
 const configuration_workflow = (req) =>
   new Workflow({
     steps: [
@@ -1350,7 +1379,7 @@ const update_calendar_event = async (
     event_view,
   });
 };
-const headers = [
+const headers = (opts) => [
   {
     headerTag: `
     <style> 
@@ -1358,20 +1387,35 @@ const headers = [
       .decoration-none:hover { text-decoration: none; }
     </style>`,
   },
-  {
-    script: `/plugins/public/fullcalendar@${
-      require("./package.json").version
-    }/main.min.js`,
-  },
+  ...(opts?.enable_premium
+    ? [
+        {
+          css: `/plugins/public/fullcalendar@${
+            require("./package.json").version
+          }/premium-main.min.css`,
+        },
+        {
+          script: `/plugins/public/fullcalendar@${
+            require("./package.json").version
+          }/premium-main.min.js`,
+        },
+      ]
+    : [
+        {
+          css: `/plugins/public/fullcalendar@${
+            require("./package.json").version
+          }/main.min.css`,
+        },
+        {
+          script: `/plugins/public/fullcalendar@${
+            require("./package.json").version
+          }/main.min.js`,
+        },
+      ]),
   {
     script: `/plugins/public/fullcalendar@${
       require("./package.json").version
     }/locales-all.min.js`,
-  },
-  {
-    css: `/plugins/public/fullcalendar@${
-      require("./package.json").version
-    }/main.min.css`,
   },
 ];
 const connectedObjects = async ({
@@ -1426,7 +1470,9 @@ module.exports = {
   sc_plugin_api_version: 1,
   headers,
   plugin_name: "fullcalendar",
-  viewtemplates: [
+  configuration_workflow: module_configuration_workflow,
+
+  viewtemplates: () => [
     {
       name: "Calendar",
       description:
