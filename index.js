@@ -76,7 +76,7 @@ const module_configuration_workflow = (req) =>
     ],
   });
 
-const configuration_workflow = (req) =>
+const configuration_workflow = (modconf) => (req) =>
   new Workflow({
     steps: [
       {
@@ -646,100 +646,108 @@ const addOtherCalendars = async (
   }
 };
 
-const run = async (table_id, viewname, config, state, extraArgs) => {
-  const {
-    view_to_create,
-    expand_view,
-    start_field,
-    allday_field,
-    end_field,
-    duration_units,
-    duration_field,
-    switch_to_duration,
-    title_field,
-    nowIndicator,
-    weekNumbers,
-    initialView,
-    default_event_color,
-    calendar_view_options,
-    custom_calendar_views,
-    event_color,
-    limit_to_working_days,
-    min_week_view_time,
-    max_week_view_time,
-    expand_display_mode,
-    create_display_mode,
-    reload_on_edit_in_pop_up,
-    event_view,
-    reload_on_drag_resize,
-    include_fml,
-    caldav_url,
-    rrule_field,
-    progressive_load,
-    ...rest
-  } = config;
-  const table = await Table.findOne({ id: table_id });
-  const fields = await table.getFields();
-  readState(state, fields);
+const run =
+  (modcfg) => async (table_id, viewname, config, state, extraArgs) => {
+    const {
+      view_to_create,
+      expand_view,
+      start_field,
+      allday_field,
+      end_field,
+      duration_units,
+      duration_field,
+      switch_to_duration,
+      title_field,
+      nowIndicator,
+      weekNumbers,
+      initialView,
+      default_event_color,
+      calendar_view_options,
+      custom_calendar_views,
+      event_color,
+      limit_to_working_days,
+      min_week_view_time,
+      max_week_view_time,
+      expand_display_mode,
+      create_display_mode,
+      reload_on_edit_in_pop_up,
+      event_view,
+      reload_on_drag_resize,
+      include_fml,
+      caldav_url,
+      rrule_field,
+      progressive_load,
+      ...rest
+    } = config;
+    const table = await Table.findOne({ id: table_id });
+    const fields = await table.getFields();
+    readState(state, fields);
 
-  let events = [];
-  if (!progressive_load) {
-    const where = await stateFieldsToWhere({ fields, state });
+    let events = [];
+    if (!progressive_load) {
+      const where = await stateFieldsToWhere({ fields, state });
 
-    if (include_fml) {
-      const ctx = {
-        ...state,
-        user_id: extraArgs.req.user?.id || null,
-        user: extraArgs.req.user,
-      };
-      let where1 = jsexprToWhere(include_fml, ctx, fields);
-      mergeIntoWhere(where, where1 || {});
+      if (include_fml) {
+        const ctx = {
+          ...state,
+          user_id: extraArgs.req.user?.id || null,
+          user: extraArgs.req.user,
+        };
+        let where1 = jsexprToWhere(include_fml, ctx, fields);
+        mergeIntoWhere(where, where1 || {});
+      }
+
+      events = await get_events(
+        table,
+        viewname,
+        config,
+        state,
+        extraArgs,
+        where
+      );
     }
 
-    events = await get_events(table, viewname, config, state, extraArgs, where);
-  }
+    const id = `cal${Math.round(Math.random() * 100000)}`;
+    const weekends = limit_to_working_days ? false : true; // fullcalendar flag to filter out weekends
+    // parse min/max times or use defaults
+    const minAsDate = new Date(`1970-01-01T${min_week_view_time}`);
+    const maxAsDate = new Date(`1970-01-01T${max_week_view_time}`);
+    const minIsValid = isValidDate(minAsDate);
+    const minTime = minIsValid ? minAsDate.toTimeString() : "00:00:00";
+    const maxIsValid = isValidDate(maxAsDate);
+    const maxTime = maxIsValid ? maxAsDate.toTimeString() : "24:00:00";
+    const alwaysAllDay = allday_field === "Always";
+    const transferedState = buildTransferedState(fields, state);
+    const excluded = [start_field];
+    if (end_field) excluded.push(end_field);
+    const transferedSelectState = buildTransferedState(fields, state, excluded);
 
-  const id = `cal${Math.round(Math.random() * 100000)}`;
-  const weekends = limit_to_working_days ? false : true; // fullcalendar flag to filter out weekends
-  // parse min/max times or use defaults
-  const minAsDate = new Date(`1970-01-01T${min_week_view_time}`);
-  const maxAsDate = new Date(`1970-01-01T${max_week_view_time}`);
-  const minIsValid = isValidDate(minAsDate);
-  const minTime = minIsValid ? minAsDate.toTimeString() : "00:00:00";
-  const maxIsValid = isValidDate(maxAsDate);
-  const maxTime = maxIsValid ? maxAsDate.toTimeString() : "24:00:00";
-  const alwaysAllDay = allday_field === "Always";
-  const transferedState = buildTransferedState(fields, state);
-  const excluded = [start_field];
-  if (end_field) excluded.push(end_field);
-  const transferedSelectState = buildTransferedState(fields, state, excluded);
-
-  return (
-    (caldav_url
-      ? script({
-          defer: true,
-          src: `/plugins/public/fullcalendar@${
-            require("./package.json").version
-          }/caldav.js`,
-        })
-      : "") +
-    (rrule_field
-      ? script({
-          defer: true,
-          src: `/plugins/public/fullcalendar@${
-            require("./package.json").version
-          }/rrule.min.js`,
-        }) +
-        script({
-          defer: true,
-          src: `/plugins/public/fullcalendar@${
-            require("./package.json").version
-          }/fc-rrule.min.js`,
-        })
-      : "") +
-    div(
-      script(
-        domReady(`
+    return (
+      (caldav_url
+        ? script({
+            defer: true,
+            src: `/plugins/public/fullcalendar@${
+              require("./package.json").version
+            }/caldav.js`,
+          })
+        : "") +
+      (rrule_field
+        ? script({
+            defer: true,
+            src: `/plugins/public/fullcalendar@${
+              require("./package.json").version
+            }/rrule.min.js`,
+          }) +
+          script({
+            defer: true,
+            src: `/plugins/public/fullcalendar@${
+              require("./package.json").version
+            }/fc-rrule.min.js`,
+          })
+        : "") +
+      div(
+        script(
+          domReady(`
   var calendarEl = document.getElementById('${id}');
 
   const locale =
@@ -1074,11 +1082,11 @@ const run = async (table_id, viewname, config, state, extraArgs) => {
     },
   });
   calendar.render();`)
-      ),
-      div({ id })
-    )
-  );
-};
+        ),
+        div({ id })
+      )
+    );
+  };
 /*
  * internal helper to build a response with the updated event
  */
@@ -1472,15 +1480,15 @@ module.exports = {
   plugin_name: "fullcalendar",
   configuration_workflow: module_configuration_workflow,
 
-  viewtemplates: () => [
+  viewtemplates: (modcfg) => [
     {
       name: "Calendar",
       description:
         "Displays items on a calendar, with options for month, week, agenda, and others.",
       display_state_form: false,
       get_state_fields,
-      configuration_workflow,
-      run,
+      configuration_workflow: configuration_workflow(modcfg),
+      run: run(modcfg),
       routes: { update_calendar_event, load_calendar_event, ajax_load_events },
       connectedObjects,
     },
