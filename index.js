@@ -333,6 +333,20 @@ const configuration_workflow = (modconf) => (req) =>
                 label: "Progressive loading",
                 type: "Bool",
               },
+              ...(modconf?.enable_premium
+                ? [
+                    {
+                      name: "resource_field",
+                      label: "Resource field",
+                      type: "String",
+                      sublabel: "A field indicating resources",
+                      required: false,
+                      attributes: {
+                        options: fields.map((f) => f.name),
+                      },
+                    },
+                  ]
+                : []),
             ],
           });
         },
@@ -547,6 +561,7 @@ const eventFromRow = async (
     title_field,
     event_color,
     rrule_field,
+    resource_field,
   }
 ) => {
   const unitSecs = unitSeconds(duration_units);
@@ -586,6 +601,9 @@ const eventFromRow = async (
     ev.rrule = `DTSTART:${moment(start).utc().format("YYYYMMDDTHHmmSS")}Z\n${
       row[rrule_field]
     }`;
+  }
+  if (resource_field) {
+    ev.resoourceId = row[resource_field];
   }
   return ev;
 };
@@ -677,6 +695,7 @@ const run =
       caldav_url,
       rrule_field,
       progressive_load,
+      resource_field,
       ...rest
     } = config;
     const table = await Table.findOne({ id: table_id });
@@ -721,7 +740,18 @@ const run =
     const excluded = [start_field];
     if (end_field) excluded.push(end_field);
     const transferedSelectState = buildTransferedState(fields, state, excluded);
-
+    let resources;
+    if (resource_field) {
+      const field = fields.find((f) => f.name === resource_field);
+      if (field.is_fkey) {
+        const table = Table.findOne(field.reftable_name);
+        const rows = await table.getRows();
+        resources = rows.map((r) => ({
+          id: r[table.pk_name],
+          title: r[field.attributes.summary_field],
+        }));
+      }
+    }
     return (
       (caldav_url
         ? script({
@@ -833,6 +863,7 @@ const run =
       calendar.setOption("headerToolbar", toolbar);
       addOverflowHidden();
     },
+    ${resources ? `resources: ${JSON.stringify(resources)},` : ""}
     locale: locale,
     headerToolbar: {
       left: 'prev,next today${view_to_create ? " add" : ""}',
@@ -1171,6 +1202,7 @@ const get_events = async (
     caldav_url,
     rrule_field,
     progressive_load,
+    resource_field,
     ...rest
   },
   state,
@@ -1215,6 +1247,7 @@ const get_events = async (
           title_field,
           event_color,
           rrule_field,
+          resource_field,
         }
       )
     )
