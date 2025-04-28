@@ -1136,6 +1136,7 @@ const buildResponse = async (
     title_field,
     event_color,
     event_view,
+    resource_field
   }
 ) => {
   const updatedRow = await table.getJoinedRows({
@@ -1164,6 +1165,7 @@ const buildResponse = async (
           switch_to_duration,
           title_field,
           event_color,
+          resource_field
         }
       ),
     },
@@ -1350,6 +1352,7 @@ const update_calendar_event = async (
     title_field,
     event_color,
     event_view,
+    resource_field
   },
   { rowId, tableId, delta, allDay, start, end },
   { req }
@@ -1418,6 +1421,7 @@ const update_calendar_event = async (
     title_field,
     event_color,
     event_view,
+    resource_field
   });
 };
 const headers = (opts) => [
