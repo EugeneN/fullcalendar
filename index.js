@@ -1453,28 +1453,18 @@ const headers = (opts) => [
     </style>`,
   },
   ...(opts?.enable_premium
-    ? [
-        {
-          css: `/plugins/public/fullcalendar@${
-            require("./package.json").version
-          }/premium-main.min.css`,
-        },
+    ? [      
         {
           script: `/plugins/public/fullcalendar@${
             require("./package.json").version
           }/premium-main.min.js`,
         },
       ]
-    : [
-        {
-          css: `/plugins/public/fullcalendar@${
-            require("./package.json").version
-          }/main.min.css`,
-        },
+    : [       
         {
           script: `/plugins/public/fullcalendar@${
             require("./package.json").version
-          }/main.min.js`,
+          }/index.global.min.js`,
         },
       ]),
   {
