@@ -606,7 +606,7 @@ const eventFromRow = async (
     eventHtml,
   };
   if (rrule_field && row[rrule_field]) {
-    ev.rrule = `DTSTART:${moment(start).utc().format("YYYYMMDDTHHmmSS")}Z\n${
+    ev.rrule = `DTSTART:${moment(start).format("YYYYMMDDTHHmmSS")}\n${
       row[rrule_field]
     }`;
   }
@@ -881,11 +881,12 @@ const run =
     },
     ${resources ? `resources: ${JSON.stringify(resources)},` : ""}
     locale: locale,
+    timeZone: "local",
     headerToolbar: {
       left: 'prev,next today${view_to_create ? " add" : ""}',
       center: 'title',
       right: '${calendar_view_options}',
-    },
+    },    
     navLinks: true,
     initialView: '${initialView}',
     nowIndicator: ${nowIndicator},
@@ -1453,14 +1454,14 @@ const headers = (opts) => [
     </style>`,
   },
   ...(opts?.enable_premium
-    ? [      
+    ? [
         {
           script: `/plugins/public/fullcalendar@${
             require("./package.json").version
           }/premium-main.min.js`,
         },
       ]
-    : [       
+    : [
         {
           script: `/plugins/public/fullcalendar@${
             require("./package.json").version
