@@ -345,6 +345,13 @@ const configuration_workflow = (modconf) => (req) =>
                         options: fields.map((f) => f.name),
                       },
                     },
+                    {
+                      name: "limit_resources",
+                      label: "Limit resource by query",
+                      type: "Bool",
+                      sublabel: "",
+                      showIf: { resource_field: fields.map((f) => f.name) },
+                    },
                   ]
                 : []),
             ],
@@ -697,6 +704,7 @@ const run =
       rrule_field,
       progressive_load,
       resource_field,
+      limit_resources,
       ...rest
     } = config;
     const table = await Table.findOne({ id: table_id });
@@ -746,7 +754,14 @@ const run =
       const field = fields.find((f) => f.name === resource_field);
       if (field.is_fkey) {
         const table = Table.findOne(field.reftable_name);
-        const rows = await table.getRows();
+        const rows = limit_resources
+          ? await table.getRows({
+              [table.pk_name]: Array.isArray(state[resource_field])
+                ? { or: state[resource_field] }
+                : state[resource_field],
+            })
+          : await table.getRows();
+
         resources = rows.map((r) => ({
           id: r[table.pk_name],
           title: r[field.attributes.summary_field],
