@@ -858,7 +858,7 @@ const run =
   var calendar = new FullCalendar.Calendar(calendarEl, {
     ${caldav_url ? `plugins: [CalDavPlugin],` : ""}
     eventContent: function(arg) {
-      if (!arg.event.extendedProps?.eventHtml) return;
+      if (!arg.event.extendedProps?.eventHtml) return true;
       else return { html: arg.event.extendedProps.eventHtml };
     },
     datesSet: (info) => {
