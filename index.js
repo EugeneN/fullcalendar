@@ -361,8 +361,9 @@ const configuration_workflow = (modconf) => (req) =>
                 name: "initialView",
                 type: "String",
                 label: "Initial calendar view",
-                sublabel:
-                  "The default calendar view shown when the calendar is loaded. Options: dayGridMonth,dayGridDay,dayGridWeek,timeGridWeek,timeGridDay,listDay,listWeek,listMonth,listYear. Default: 'dayGridMonth'.",
+                sublabel: modconf?.enable_premium
+                  ? "The default calendar view shown when the calendar is loaded. Options: dayGridMonth,dayGridDay,dayGridWeek,timeGridWeek,timeGridDay,listDay,listWeek,listMonth,listYear,resourceTimeGridDay. Default: 'dayGridMonth'."
+                  : "The default calendar view shown when the calendar is loaded. Options: dayGridMonth,dayGridDay,dayGridWeek,timeGridWeek,timeGridDay,listDay,listWeek,listMonth,listYear. Default: 'dayGridMonth'.",
                 required: true,
                 default: "dayGridMonth",
               },
@@ -1355,7 +1356,7 @@ const update_calendar_event = async (
     event_color,
     event_view,
     resource_field,
-    rrule_field
+    rrule_field,
   },
   { rowId, tableId, delta, allDay, start, end },
   { req }
