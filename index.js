@@ -1315,7 +1315,7 @@ const ajax_load_events = async (
           [config.start_field]: { lt: new Date(info.end) },
           ...where,
         },
-        { not: { [config.rrule_field]: null } },
+        { not: { [config.rrule_field]: null }, ...where },
       ],
     };
   } else if (info.start && info.end) {
