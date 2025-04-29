@@ -64,7 +64,7 @@ const module_configuration_workflow = (req) =>
                 default: false,
               },
               {
-                name: "premium_license",
+                name: "premium_license_key",
                 type: "String",
                 label: "Premium license key",
                 showIf: { enable_premium: true },
@@ -768,6 +768,8 @@ const run =
         }));
       }
     }
+    console.log({modcfg});
+    
     return (
       (caldav_url
         ? script({
@@ -861,6 +863,11 @@ const run =
       if (!arg.event.extendedProps?.eventHtml) return true;
       else return { html: arg.event.extendedProps.eventHtml };
     },
+    ${
+      modcfg?.enable_premium && modcfg?.premium_license_key
+        ? `schedulerLicenseKey: '${modcfg.premium_license_key}',`
+        : ""
+    }
     datesSet: (info) => {
       let filterBtn = "";
       if (
