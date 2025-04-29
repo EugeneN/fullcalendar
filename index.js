@@ -611,7 +611,7 @@ const eventFromRow = async (
     }`;
   }
   if (resource_field) {
-    ev.resoourceId = row[resource_field];
+    ev.resourceId = row[resource_field];
   }
   return ev;
 };
