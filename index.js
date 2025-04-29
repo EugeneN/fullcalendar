@@ -369,7 +369,7 @@ const configuration_workflow = (modconf) => (req) =>
                 type: "String",
                 label: "Initial calendar view",
                 sublabel: modconf?.enable_premium
-                  ? "The default calendar view shown when the calendar is loaded. Options: dayGridMonth,dayGridDay,dayGridWeek,timeGridWeek,timeGridDay,listDay,listWeek,listMonth,listYear,resourceTimeGridDay. Default: 'dayGridMonth'."
+                  ? "The default calendar view shown when the calendar is loaded. Options: dayGridMonth,dayGridDay,dayGridWeek,timeGridWeek,timeGridDay,listDay,listWeek,listMonth,listYear,resourceTimeGridDay,resourceTimeline. Default: 'dayGridMonth'."
                   : "The default calendar view shown when the calendar is loaded. Options: dayGridMonth,dayGridDay,dayGridWeek,timeGridWeek,timeGridDay,listDay,listWeek,listMonth,listYear. Default: 'dayGridMonth'.",
                 required: true,
                 default: "dayGridMonth",
