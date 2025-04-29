@@ -609,6 +609,10 @@ const eventFromRow = async (
     ev.rrule = `DTSTART:${moment(start).format("YYYYMMDDTHHmmSS")}\n${
       row[rrule_field]
     }`;
+    ev.duration =
+      start?.getTime && end?.getTime
+        ? end.getTime() - start.getTime()
+        : undefined;
   }
   if (resource_field) {
     ev.resourceId = row[resource_field];
@@ -768,8 +772,8 @@ const run =
         }));
       }
     }
-    console.log({modcfg});
-    
+    console.log({ modcfg });
+
     return (
       (caldav_url
         ? script({
