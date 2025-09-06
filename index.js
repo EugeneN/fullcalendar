@@ -1470,6 +1470,7 @@ const headers = (opts) => [
           script: `/plugins/public/fullcalendar@${
             require("./package.json").version
           }/premium-main.min.js`,
+          onlyViews: ["Calendar"],
         },
       ]
     : [
@@ -1477,12 +1478,14 @@ const headers = (opts) => [
           script: `/plugins/public/fullcalendar@${
             require("./package.json").version
           }/index.global.min.js`,
+          onlyViews: ["Calendar"],
         },
       ]),
   {
     script: `/plugins/public/fullcalendar@${
       require("./package.json").version
     }/locales-all.min.js`,
+    onlyViews: ["Calendar"],
   },
 ];
 const connectedObjects = async ({
