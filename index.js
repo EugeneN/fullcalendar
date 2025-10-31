@@ -1338,8 +1338,8 @@ const ajax_load_events = async (
     where2 = {
       or: [
         {
-          [config.end_field]: { gt: new Date(info.start) },
-          [config.start_field]: { lt: new Date(info.end) },
+          // [config.end_field]: { gt: new Date(info.start) },
+          [config.start_field]: { lt: new Date(info.end), gt: new Date(info.start) },
           ...where,
         },
         { not: { [config.rrule_field]: null }, ...where },
@@ -1347,8 +1347,8 @@ const ajax_load_events = async (
     };
   } else if (info.start && info.end) {
     where2 = {
-      [config.end_field]: { gt: new Date(info.start) },
-      [config.start_field]: { lt: new Date(info.end) },
+      // [config.end_field]: { gt: new Date(info.start) },
+      [config.start_field]: { lt: new Date(info.end), gt: new Date(info.start) },
       ...where,
     };
   }
