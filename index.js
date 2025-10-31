@@ -1259,6 +1259,8 @@ const get_events = async (
   const eventView = event_view
     ? await View.findOne({ name: event_view })
     : undefined;
+
+  // this takes ~10 sec on ~300 events 
   const events = await Promise.all(
     rows.map((row) =>
       eventFromRow(
