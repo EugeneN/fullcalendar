@@ -230,6 +230,20 @@ const configuration_workflow = (modconf) => (req) =>
                 },
               },
               {
+                name: "event_uid_field",
+                label: "Event UID field",
+                type: "String",
+                sublabel:
+                  "Optional. A String field holding the iCalendar UID, to prevent overriden recurrent event duplicates",
+                required: false,
+                attributes: {
+                  options: fields
+                    .filter((f) => f.type.name === "String")
+                    .map((f) => f.name)
+                    .join(),
+                },
+              },
+              {
                 name: "include_fml",
                 label: req.__("Row inclusion formula"),
                 class: "validate-expression",
@@ -570,7 +584,9 @@ const eventFromRow = async (
     event_color,
     rrule_field,
     resource_field,
-  }
+    event_uid_field,
+  },
+  overrideMap
 ) => {
   const unitSecs = unitSeconds(duration_units);
   const duration_in_seconds = row[duration_field] * unitSecs; //duration in seconds = duration * unit
@@ -606,9 +622,20 @@ const eventFromRow = async (
     eventHtml,
   };
   if (rrule_field && row[rrule_field]) {
-    ev.rrule = `DTSTART:${moment(start).format("YYYYMMDDTHHmmSS")}\n${
-      row[rrule_field]
-    }`;
+    let rruleStr = row[rrule_field];
+    if (
+      event_uid_field &&
+      row[event_uid_field] &&
+      overrideMap &&
+      overrideMap.has(row[event_uid_field])
+    ) {
+      const exdates = overrideMap
+        .get(row[event_uid_field])
+        .map((d) => moment(d).utc().format("YYYYMMDDTHHmmSS") + "Z")
+        .join(",");
+      if (exdates) rruleStr = `${rruleStr}\nEXDATE:${exdates}`;
+    }
+    ev.rrule = `DTSTART:${moment(start).format("YYYYMMDDTHHmmSS")}\n${rruleStr}`;
     ev.duration =
       start?.getTime && end?.getTime
         ? end.getTime() - start.getTime()
@@ -638,6 +665,23 @@ const durationIsFloat = (fields, duration_field) => {
   else return field.type.name === "Float";
 };
 
+// Build a map { uid -> [override_start_date,...] } from a result set.
+// Only rows without a recurrence rule but with a UID are treated as overrides
+// of a matching series row (same UID, has a recurrence rule).
+const buildOverrideMap = (rows, event_uid_field, rrule_field, start_field) => {
+  const map = new Map();
+  if (!event_uid_field || !rrule_field || !start_field) return map;
+  for (const r of rows) {
+    const uid = r[event_uid_field];
+    if (!uid) continue;
+    if (!r[rrule_field] && r[start_field]) {
+      if (!map.has(uid)) map.set(uid, []);
+      map.get(uid).push(r[start_field]);
+    }
+  }
+  return map;
+};
+
 const addOtherCalendars = async (
   events,
   otherCalendars,
@@ -659,6 +703,12 @@ const addOtherCalendars = async (
     const eventView = configuration.event_view
       ? await View.findOne({ name: configuration.event_view })
       : undefined;
+    const subOverrideMap = buildOverrideMap(
+      rows,
+      configuration.event_uid_field,
+      configuration.rrule_field,
+      configuration.start_field
+    );
     const otherEvents = await Promise.all(
       rows.map((row) =>
         eventFromRow(
@@ -668,7 +718,8 @@ const addOtherCalendars = async (
           transferedState,
           eventView,
           req,
-          configuration
+          configuration,
+          subOverrideMap
         )
       )
     );
@@ -1233,6 +1284,7 @@ const get_events = async (
     include_fml,
     caldav_url,
     rrule_field,
+    event_uid_field,
     progressive_load,
     resource_field,
     ...rest
@@ -1247,6 +1299,13 @@ const get_events = async (
     where,
     joinFields: buildJoinFields(event_color),
   });
+
+  const overrideMap = buildOverrideMap(
+    rows,
+    event_uid_field,
+    rrule_field,
+    start_field
+  );
 
   const otherCalendars = (await View.find({ viewtemplate: "Calendar" })).filter(
     (view) => view.name !== viewname && rest[view.name]
@@ -1280,7 +1339,9 @@ const get_events = async (
           event_color,
           rrule_field,
           resource_field,
-        }
+          event_uid_field,
+        },
+        overrideMap
       )
     )
   );
